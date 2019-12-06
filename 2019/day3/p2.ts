@@ -1,7 +1,7 @@
 // and on this day Jesus wept
 namespace day3 {
 
-    let grid = new Map<string, number[2]>();
+    let grid = new Map<string, number[]>();
     let shortestDistance = Number.MAX_SAFE_INTEGER;
 
     console.log(((wires: string[]): number => {
