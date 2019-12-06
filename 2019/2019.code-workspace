@@ -1,0 +1,10 @@
+{
+	"folders": [
+		{
+			"path": "C:\\dev\\git\\adventofcode"
+		}
+	],
+	"settings": {
+		"terminal.integrated.shell.windows": "cmd.exe"
+	}
+}
