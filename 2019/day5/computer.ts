@@ -17,15 +17,7 @@ export class Computer {
     initialMemory: MemoryBank;
     runningMemory: MemoryBank;
     running: Boolean;
-
-    opFnMap: ((address: number, modes: Mode[]) => number)[] = [
-        this.noop,
-        this.add,
-        this.multiply,
-        this.store,
-        this.output
-    ];
-
+    
     constructor(memoryBank: MemoryBank) {
         this.initialMemory = new MemoryBank(memoryBank.memory);
         this.running = true;
@@ -33,40 +25,36 @@ export class Computer {
 
     read(address: number, mode: Mode): number {
         switch (mode) {
-            case Mode.IMMEDIATE:
-                return this.runningMemory[address];
             case Mode.POSITION:
-                return this.runningMemory[this.runningMemory[address]];
+                return this.runningMemory.memory[this.runningMemory.memory[address]];
+            case Mode.IMMEDIATE:
+                return this.runningMemory.memory[address];
         }
         return 0;
     }
 
     write(address: number, value: number, mode: Mode): void {
         switch (mode) {
-            case Mode.IMMEDIATE:
-                this.runningMemory[address] = value;
-                break;
             case Mode.POSITION:
                 this.runningMemory[this.runningMemory[address]] = value;
+                break;
+            case Mode.IMMEDIATE:
+                this.runningMemory[address] = value;
                 break;
         }
     }
 
-    noop(address: number, modes: Mode[]): number {
-        return 0;
-    }
-
     add(address: number, modes: Mode[]): number {
-        let a = this.read(address, modes[0]);
-        let b = this.read(address + 1, modes[1]);
-        this.write(address + 2, a + b, modes[2]);
+        let a = this.read(address + 1, modes[0]);
+        let b = this.read(address + 2, modes[1]);
+        this.write(address + 3, a + b, modes[2]);
         return 3;
     }
 
     multiply(address: number, modes: Mode[]): number {
-        let a = this.read(address, modes[0]);
-        let b = this.read(address + 1, modes[1]);
-        this.write(address + 2, a * b, modes[2]);
+        let a = this.read(address + 1, modes[0]);
+        let b = this.read(address + 2, modes[1]);
+        this.write(address + 3, a * b, modes[2]);
         return 3;
     }
 
@@ -78,19 +66,41 @@ export class Computer {
         return 0;
     }
 
-    executeInstruction(instrPtr: number) {
-        
-        let opCode = this.runningMemory[instrPtr];
-        let modes = [
+    fetchInstruction(instrPtr: number): [ number, Mode[] ]{
+        let rawOpCode = this.read(instrPtr, Mode.IMMEDIATE);
+        let opCode = rawOpCode % 100;
+        let modes: Mode[] = [];
 
-        ];
+        // I just didn't want to use strings
+        let test = 10000;
+        while (test >= 100) {
+            let bitset = (Math.floor(rawOpCode / test) == 1) ?
+                    Mode.IMMEDIATE : Mode.POSITION;
+            modes.unshift(bitset);
+            if (bitset == Mode.IMMEDIATE) {
+                rawOpCode -= test;
+            }
+            test /= 10;
+        }
+        return [ opCode, modes ];
+    }
+
+    executeInstruction(instrPtr: number) {
+
+        let instruction = this.fetchInstruction(instrPtr);
+        let opCode = instruction[0];
+        let modes = instruction[1];
 
         let instrSize = 0;
 
         switch (opCode) {
-            case 1:
+            case 1: {
+                instrSize = this.add(instrPtr, modes);
+                break;
+            }
+
             case 2: {
-                instrSize = this.opFnMap[opCode](instrPtr, modes);
+                instrSize = this.multiply(instrPtr, modes);
                 break;
             }
 
@@ -108,7 +118,7 @@ export class Computer {
             }
         }
 
-        // increment instrPtr by opcode + paramSize
+        // increment instrPtr by opcode + instruction size
         return instrPtr + 1 + instrSize;
     }
 
@@ -118,10 +128,11 @@ export class Computer {
         });
     }
 
-    run(input: number): number {
+    run(input: number, patches: [number, number][]): number {
 
         this.input = input;
         this.runningMemory = new MemoryBank(this.initialMemory.memory);
+        this.patch(patches || []);
 
         let instrPtr = 0;
         while (this.running) {
