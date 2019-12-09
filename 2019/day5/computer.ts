@@ -6,13 +6,19 @@ export class MemoryBank {
     }
 }
 
+
+const enum Mode {
+    POSITION = 0,
+    IMMEDIATE
+}
+
 export class Computer {
     input: number;
     initialMemory: MemoryBank;
     runningMemory: MemoryBank;
     running: Boolean;
 
-    opFnMap: ((params: number[]) => number)[] = [
+    opFnMap: ((address: number, modes: Mode[]) => number)[] = [
         this.noop,
         this.add,
         this.multiply,
@@ -25,61 +31,85 @@ export class Computer {
         this.running = true;
     }
 
-    noop(params: number[]): number {
+    read(address: number, mode: Mode): number {
+        switch (mode) {
+            case Mode.IMMEDIATE:
+                return this.runningMemory[address];
+            case Mode.POSITION:
+                return this.runningMemory[this.runningMemory[address]];
+        }
         return 0;
     }
 
-    add(params: number[]): number {
-        return params[0] + params[1];
+    write(address: number, value: number, mode: Mode): void {
+        switch (mode) {
+            case Mode.IMMEDIATE:
+                this.runningMemory[address] = value;
+                break;
+            case Mode.POSITION:
+                this.runningMemory[this.runningMemory[address]] = value;
+                break;
+        }
     }
 
-    multiply(params: number[]): number {
-        return params[0] * params[1];
+    noop(address: number, modes: Mode[]): number {
+        return 0;
     }
 
-    store(params: number[]): number {
-        return params[0];
+    add(address: number, modes: Mode[]): number {
+        let a = this.read(address, modes[0]);
+        let b = this.read(address + 1, modes[1]);
+        this.write(address + 2, a + b, modes[2]);
+        return 3;
     }
 
-    output(params: number[]): number {
-        return params[0];
+    multiply(address: number, modes: Mode[]): number {
+        let a = this.read(address, modes[0]);
+        let b = this.read(address + 1, modes[1]);
+        this.write(address + 2, a * b, modes[2]);
+        return 3;
+    }
+
+    store(address: number, modes: Mode[]): number {
+        return 0;
+    }
+
+    output(address: number, modes: Mode[]): number {
+        return 0;
     }
 
     executeInstruction(instrPtr: number) {
-        const memory = this.runningMemory.memory;
+        
+        let opCode = this.runningMemory[instrPtr];
+        let modes = [
 
-        let opCode = memory[instrPtr];
-        let params = [];
+        ];
+
+        let instrSize = 0;
 
         switch (opCode) {
             case 1:
-            case 2:
-                params = [
-                    memory[memory[instrPtr + 1]],
-                    memory[memory[instrPtr + 2]],
-                    memory[instrPtr + 3]
-                ];
-                memory[params[2]] = this.opFnMap[opCode](params);
-                break;
-
-            case 3:
-                params = [ this.input ];
-                memory[memory[instrPtr + 1]] = this.opFnMap[opCode](params);
-                break;
-
-            case 4: {
-                params = [ memory[memory[instrPtr + 1]] ];
-                let output = this.opFnMap[opCode](params);
+            case 2: {
+                instrSize = this.opFnMap[opCode](instrPtr, modes);
                 break;
             }
 
-            case 99:
+            case 3: {
+                break;
+            }
+
+            case 4: {
+                break;
+            }
+
+            case 99: {
                 this.running = false;
                 break;
+            }
         }
 
         // increment instrPtr by opcode + paramSize
-        return instrPtr + 1 + params.length;
+        return instrPtr + 1 + instrSize;
     }
 
     patch(patchTuples: [number, number][]) {
